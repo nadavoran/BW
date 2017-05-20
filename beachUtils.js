@@ -87,7 +87,6 @@ let beachUtils = {
         return Math.min(10, Math.round(score));
     },
     fetchForecast(beachLocation, beachName, today, successCallback, failureCallback) {
-        //fetch(`https://api.darksky.net/forecast/77d1a74f95e7565281f5d59157c898fa/32.146284,%2034.791701?exclude=minutely&units=si`) difference
         fetch(`https://salty-waters-82263.herokuapp.com/weather?q=${beachLocation}&name=${beachName}&hours=${today.getHours()}`)
             .then((response) => {
                 return response.json();})
@@ -123,30 +122,13 @@ let beachUtils = {
                     } else {
                         hoursIndexes[time.date()].push({index: wIndex, weather: weather, time: displayTime});
                     }
-                    return {time:time, weather: weather, toString: ()=> displayName};
+                    return {time:time, weather: weather, displayText: displayName, toString: ()=> displayName};
                 });
-                //.filter((weather, index, all)=>{
-                //    return !skippedDay || index > 0;
-                //})
-                //var skippedDay = weatherData[0].time.day() != moment.unix(allWeather.hourly.data[0].time).day();
                 let weatherDay = allWeather.daily.data.map((weather)=>{
                     let time = moment.unix(weather.time),
                         day = time.date() == today.getDate() ? "היום" : daysOfWeek[time.day()];
-                    let displayName = `${day} - ${time.date()}/${time.month()}/${time.year()} `;
-                    //if (hoursIndexes[time.date()]){
-                    //    weather.apparentTemperatureMax = 0;
-                    //    weather.windSpeed = 0;
-                    //    hoursIndexes[time.date()].forEach((element)=>{
-                    //        weather.apparentTemperatureMax += element.weather.apparentTemperature;
-                    //        weather.windSpeed += element.weather.windSpeed;
-                    //    });
-                    //    weather.apparentTemperatureMax /= hoursIndexes[time.date()].length;
-                    //    weather.windSpeed /= hoursIndexes[time.date()].length;
-                    //}
-                    //if (weather.apparentTemperatureMax ) {
-                    //    weather.apparentTemperatureMax = Math.round(weather.apparentTemperatureMax);
-                    //}
-                    return {time:time, day: time.date(), format: day, weather: weather, toString: ()=> displayName};
+                    let displayName = `${day} - ${time.date()}/${(time.month() + 1)}/${time.year()} `;
+                    return {time:time, day: time.date(), format: day, weather: weather, displayText: displayName, toString: ()=> displayName};
                 });
                 successCallback && successCallback(weatherData,  weatherDay, hoursIndexes, currentWeather);
             }).catch((ex)=>{
@@ -157,33 +139,6 @@ let beachUtils = {
     getResultString(score, forDay, time){
         return `${forDay} ${score ? 'לא': '' } ${time} טוב ללכת ליום`;
     }
-    //fetchForecast(successCallback, failureCallback){
-    //    fetch('http://api.openweathermap.org/data/2.5/forecast?lat=32.150566&lon=34.793101&appid=cd4ac4acb5ff040c07a8cc93f5884ec5&units=metric')
-    //        .then((response) => {
-    //            return response.json();})
-    //        .then((responseJson) => {
-    //            let allWeather = responseJson;
-    //            if (!allWeather || !allWeather.list || !allWeather.list.length){
-    //                failureCallback && failureCallback(`Weather forecast was empty ${req.responseText}`);
-    //                return;
-    //            }
-    //            var daysOfWeek = ["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
-    //            let weatherData = allWeather.list.filter((weather, index, all)=>{
-    //                let time = moment(weather.dt_txt);
-    //                console.log(`filter is ${weather.dt_txt} hour is ${time.hours()} day is ${time.day()}`);
-    //                return time.hours() > 8 && time.hours() < 17;
-    //            }).map((weather)=>{
-    //                let time = moment(weather.dt_txt);
-    //                let displayName = `${daysOfWeek[time.day()]} - ${time.hours()}` ;
-    //                return {time:time, weather: weather, toString: ()=> displayName};
-    //            });
-    //            successCallback && successCallback(weatherData);
-    //        }).catch((ex)=>{
-    //        failureCallback && failureCallback("failed to load resource", ex);
-    //    });
-    //
-    //},
-    //},
 };
 
 module.exports = {beachUtils};

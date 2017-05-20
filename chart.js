@@ -64,7 +64,6 @@ export default class PlayerTrendBarItem extends Component {
             right: barInterval,
             height: (high * unitHeight)
         };
-        let barStyle = {};
         if (value > 0) {
             entity = value;
             emptyTop = Math.max(0,high/2 - value);
@@ -77,16 +76,6 @@ export default class PlayerTrendBarItem extends Component {
             entity = Math.abs(value);
             emptyTop = (high)/2 + 3.8;
             emptyBottom = Math.max(0,high/2 - value);
-            //emptyTop = Math.abs(low) - entity;
-            //emptyBottom = Math.abs(low) - entity;
-            barStyle ={
-                top: (emptyTop * unitHeight),
-                position: "relative",
-                //height: (empty * unitHeight),
-                //transform: [{
-                //    rotate: '180deg'
-                //}]
-            }
         }
 
         /* Prevent tooltip covered by the edge */
@@ -96,7 +85,6 @@ export default class PlayerTrendBarItem extends Component {
         };
         let tooltipMark = {
             left: tooltipWidth / 2,
-            //width: barWidth,
             marginLeft: -6,
             borderLeftWidth: 6,
             borderRightWidth: 6
@@ -146,34 +134,10 @@ export default class PlayerTrendBarItem extends Component {
         )
     }
 }
-//
-//<View style={[styles.container, {marginTop: barItemTop}]}>
-//    <View style={[styles. barWrapper, Object.assign({},wrapperStyle)]}>
-//        <View style={[styles.bar, barStyle, styles.empty, baseStyle]} />
-//        <View style={[styles.bar, Object.assign({}, baseStyle, {height: (entity * unitHeight)})]} />
-//        <Text style={[styles.text, {fontWeight: isActive? 'bold' : 'normal'}]}>{colName}</Text>
-//    </View>
-//{isHover &&
-//<View style={[styles.tooltip, tooltipPosition]}>
-//    <Text style={styles.tooltipContent}>תחזית ליום {day} בשעה {colName} </Text>
-//    <Text style={styles.tooltipContent}>טמפרטורה : &#8451;{temperature} </Text>
-//    <Text style={styles.tooltipContent}>מהירות הרוח: {speed}</Text>
-//    <Text style={styles.tooltipContent}>כיוון הרוח: {direction}</Text>
-//    <Text style={styles.tooltipContent}>עננים: {cloud}</Text>
-//    <Text style={styles.tooltipContent}>ציון: {score}</Text>
-//    <Text style={styles.tooltipContent}>{resultString}</Text>
-//    <View style={[styles.tooltipMark, tooltipMark]} />
-//</View>
-//}
 const styles = StyleSheet.create({
     container: {
-        position: 'relative',
-        //justifyContent:'space-between',
-        //borderWidth: 1,
-        //borderStyle: "solid",
-        //borderColor: "black"
+        position: 'relative'
     },
-    // Bar
     barWrapper: {
         position: 'relative',
         marginHorizontal: 2,
@@ -181,32 +145,18 @@ const styles = StyleSheet.create({
         borderBottomWidth:1,
         borderStyle: "solid",
         borderColor: "rgba(100,100,100,0.5)"
-        //justifyContent:'space-between',
-        //alignItems: 'space-between',
-        //borderWidth: 1,
-        //borderStyle: "solid",
-        //borderColor: "green"
     },
     bar: {
-        //marginHorizontal: 2,
-        //paddingHorizontal: 2,
-        //borderWidth: 1,
-        //borderStyle: "solid",
-        //borderColor: "purple"
     },
     empty: {
-        opacity: 0,
-        //color: "grey"
+        opacity: 0
     },
     text: {
         textAlign: 'center',
         fontSize: 12,
         marginTop: 1,
-        //marginHorizontal: 2,
-        //color: 'rgba(0, 0, 0, 0.9)'
         color: '#333'
     },
-    // Tooltip
     tooltip: {
         backgroundColor: 'rgba(0, 0, 0, 1)',
         borderRadius: 5,
@@ -231,15 +181,4 @@ const styles = StyleSheet.create({
         height: 0,
         width: 0
     }
-})
-//
-//PlayerTrendBarItem.propTypes = {
-//    value: PropTypes.number,
-//    high: PropTypes.number,
-//    low: PropTypes.number,
-//    color: PropTypes.string,
-//    unitHeight: PropTypes.number,
-//    date: PropTypes.string,
-//    barInterval: PropTypes.number,
-//    barItemTop: PropTypes.number
-//}
+});

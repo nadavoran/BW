@@ -29,11 +29,7 @@ import Collapsible from 'react-native-collapsible';
 var {
     beachUtils
     } = require('./beachUtils.js');
-//var BeachWeatherComp = require('./index.js');
-import ToolTipWithView from './toolTip.js';
-import DropDown from './dropDown.js';
 import PlayerTrendBarItem from './chart.js';
-// //import beachWeather from 'beachWeather';
 
 import ModalDropdown from 'react-native-modal-dropdown';
 import moment from 'moment';
@@ -48,22 +44,33 @@ var beachLocation = `32.146284,34.791701`;
 var beachName = `חוף הצוק`;
 var lastSavedDay;
 var currentWeather;
-const beachLocationKey = "@BeachWeather:beachLocation";
-const beachNameKey = "@BeachWeather:beachName";
+const beachKey = "@BeachWeather:beach";
+const weatherKey = "@BeachWeather:weather";
 export default class BeachWeather extends Component {
     constructor(props) {
         super(props);
-        var availableBeachLoaded, beachNameExists, beachLocationExists;
-        loadWeatherForBeach = ()=>{
-            if (!availableBeachLoaded || !beachNameExists || !beachLocationExists) return;
-            var selectedBeachIndex = 0;
+        var availableBeachLoaded, beachExists, dataBeachName, selectedBeachIndex = null;
+        var setDayAndBeach = ()=>{
+            this.refs.daysDrop && this.refs.daysDrop.select(0);
+            if (selectedBeachIndex != null && this.refs && this.refs.beachSelection) {
+                this.refs.beachSelection.select(selectedBeachIndex);
+            }
+        };
+        var loadWeatherForBeach = ()=>{
+            if (!availableBeachLoaded || !beachExists) return;
+            selectedBeachIndex = 0;
             this.state.availableBeach.some((beach, index)=>{
                 if (beach.name == beachName){
                     selectedBeachIndex = index;
                     return true;
                 }
             });
-            loadStartForecast(selectedBeachIndex || 0);
+            console.log(`data: ${dataBeachName}, beachName: ${beachName}, index: ${selectedBeachIndex}, length: ${this.state.availableBeach.length}`);
+            if (dataBeachName && dataBeachName == beachName) {
+                setDayAndBeach();
+                return;
+            }
+            loadStartForecast();
         };
         this.fetchAvailableBeach((available)=>{
             console.log(`available ${available}`);
@@ -73,57 +80,64 @@ export default class BeachWeather extends Component {
                 loadWeatherForBeach();
             }
         });
-        loadStartForecast = (selectedBeachIndex)=>{
+        var retrievedData = (data, days, hoursIndexes, current)=>{
+            currentWeather = current;
+            this.hoursIndexes = hoursIndexes;
+            this._loadWeather(days[0]);
+            this._loadHours(days[0].day);
+            this.setState({selectedIndex: 0, selectedDateIndex: 0, day: days[0].toString(), optionsDate:data, optionsDay:days,
+                valueDate: data[0].toString(), buttonText: days[0].toString(), prevState: true, prevDayState: true});
+            dataBeachName = beachName;
+            setDayAndBeach();
+        };
+
+        let loadStartForecast = ()=>{
             beachUtils.fetchForecast(beachLocation, beachName, today, (data, days, hoursIndexes, current)=>{
                 if (!data || !data.length) return;
                 today = new Date();
-                currentWeather = current;
-                this.hoursIndexes = hoursIndexes;
-                this._loadWeather(days[0]);
-                this._loadHours(days[0].day);
-                this.setState({selectedIndex: 0, selectedDateIndex: 0, day: days[0].toString(), optionsDate:data, optionsDay:days,
-                    valueDate: data[0].toString(), buttonText: days[0].toString(), prevState: true, prevDayState: true, showSplash: false});
-                this.refs.daysDrop.select(0);
-                this.refs.beachSelection.select(selectedBeachIndex);
+                retrievedData(data, days, hoursIndexes, current, selectedBeachIndex);
+                AsyncStorage.setItem(weatherKey, JSON.stringify({today: today.getTime(), beachName: beachName, data: data, days: days, hoursIndexes: hoursIndexes, current: current, selectedBeachIndex: selectedBeachIndex}));
             }, (errorMessage, ex)=>{
-                this.setState({result:`data didn't loaded because - ${errorMessage}`, showSplash: false});
+                debugger;
+                this.setState({result:` ex: ${ex}`, showSplash: false});
             });
         };
 
         try {
-            var locationKey, nameKey;
-            AsyncStorage.getItem(beachLocationKey).then((location) => {
-                locationKey = location;
-                if (location){
-                    // We have data!!
-                    console.log(location);
-                    beachLocation = location;
-                    beachLocationExists = true;
-                    if (!!nameKey){
-                        loadWeatherForBeach();
-                    }
+            //var locationKey, nameKey;
+            AsyncStorage.getItem(beachKey).then((beachData) => {
+                if (beachData){
+                    beachData = JSON.parse(beachData);
+                    beachLocation = beachData.location;
+                    beachName = beachData.name;
+                    beachExists = true;
+                    loadWeatherForBeach();
                 } else {
                     //load with default
-                    AsyncStorage.setItem(beachLocationKey, beachLocation);
-                    beachLocationExists = true;
+                    AsyncStorage.setItem(beachKey, JSON.stringify({location: beachLocation, name: beachName}));
+                    beachExists = true;
                     loadWeatherForBeach();
                 }
             });
-            AsyncStorage.getItem(beachNameKey).then((name) => {
-                nameKey = name;
-                if (!!nameKey){
-                    // We have data!!
-                    console.log(nameKey);
-                    beachName = nameKey;
-                    beachNameExists = true;
-                    if (locationKey){
-                        loadWeatherForBeach();
+            AsyncStorage.getItem(weatherKey).then((weatherData) => {
+                if (weatherData){
+                    weatherData = JSON.parse(weatherData);
+                    if (!weatherData) return;
+                    if (Date.now() - weatherData.today < 5*60*1000 ){
+                        dataBeachName = weatherData.beachName;
                     }
-                } else {
-                    //load with default
-                    beachNameExists = true;
-                    AsyncStorage.setItem(beachNameKey, beachName);
-                    loadWeatherForBeach();
+                    weatherData.days = weatherData.days.map(day=>{
+                        day.toString = ()=>{
+                            return day.displayText;
+                        };
+                        return day;
+                    });
+                    retrievedData(weatherData.data, weatherData.days, weatherData.hoursIndexes, weatherData.today, weatherData.selectedBeachIndex);
+                    this.setState({beachText: dataBeachName});
+                    setTimeout(()=>{
+                        this.setState({showSplash: false});
+                    }, 700);
+                    //loadWeatherForBeach();
                 }
             });
         } catch (error) {
@@ -132,22 +146,10 @@ export default class BeachWeather extends Component {
             // Error retrieving data
             loadWeatherForBeach();
         }
-        //beachUtils.fetchForecast(beachLocation, beachName, today, (data, days, hoursIndexes, current)=>{
-        //    if (!data || !data.length) return;
-        //    today = new Date();
-        //    currentWeather = current;
-        //    this.hoursIndexes = hoursIndexes;
-        //    this._loadWeather(days[0]);
-        //    this._loadHours(days[0].day);
-        //    this.setState({selectedIndex: 0, selectedDateIndex: 0, day: days[0].toString(), optionsDate:data, optionsDay:days,
-        //        valueDate: data[0].toString(), buttonText: days[0].toString(), prevState: true, prevDayState: true, showSplash: false});
-        //    this.refs.daysDrop.select(0);
-        //}, (errorMessage, ex)=>{
-        //    this.setState({result:`data didn't loaded because - ${errorMessage}`, showSplash: false});
-        //});
         setTimeout(()=>{
-            this.setState({showSplash: false})
-        }, 15000);
+            this.setState({showSplash: false});
+            setDayAndBeach();
+        }, 1500);
         this.state = {
             day: '',
             temperature: '',
@@ -186,7 +188,7 @@ export default class BeachWeather extends Component {
             visibleHour: -1,
             language:"data",
             beachText:"חוף הצוק",
-            availableBeach: [],
+            availableBeach: null,
             appState: 'active'
         };
         this.state.optionsDay = [{time:'Day 1',id:1, toString: ()=>"Date 1"},{time:'Date 2',id:2, toString: ()=>"Date 2"},{time:'Date 3',id:3, toString: ()=>"Date 3"},{time:'Date 4',id:4, toString: ()=>"Date 4"}];
@@ -256,10 +258,8 @@ export default class BeachWeather extends Component {
             chartScoreResult[index] = beachUtils.getWeatherScoreResult(element.weather);
             chartTime[index] = element.time,
             tempChartValue[index] = (score - 5)* unitHeight;
-            //tempChartValue[index] = ((score > 5 ? score : 10 - score) / 2)* unitHeight;
             let r = (191 * (10 - score)) / 10;
             let g= (191 * score) / 10;
-            //B = 0
             tempChartColor[index] = `rgb(${r},${g},0)`;
         });
         this.setState({
@@ -278,20 +278,18 @@ export default class BeachWeather extends Component {
     }
 
     _render_dropdown(rowData, rowID, highlighted) {
-        //let icon = highlighted ? require('./images/heart.png') : require('./images/flower.png');
         let evenRow = rowID % 2;
         return (
             <TouchableHighlight underlayColor='cornflowerblue'>
-            <View style={[styles.dropdown_2_row, {backgroundColor: evenRow ? '#f0f5fd' : 'white'}]}>
-    <Text style={[styles.dropdown_2_row_text, highlighted && {color: 'mediumaquamarine'}]}>
-        {`${rowData}`}
-    </Text>
-        </View>
-        </TouchableHighlight>
-    );
+                <View style={[styles.dropdown_2_row, {backgroundColor: evenRow ? '#f0f5fd' : 'white'}]}>
+                    <Text style={[styles.dropdown_2_row_text, highlighted && {color: 'mediumaquamarine'}]}>
+                        {`${rowData}`}
+                    </Text>
+                </View>
+            </TouchableHighlight>
+        );
     }
     _render_dropdown_beach(rowData, rowID, highlighted) {
-        //let icon = highlighted ? require('./images/heart.png') : require('./images/flower.png');
         let evenRow = rowID % 2;
         return (
             <TouchableHighlight underlayColor='cornflowerblue'>
@@ -316,11 +314,6 @@ export default class BeachWeather extends Component {
         this.setState({day: value.toString(), prevState: idx < 1, nextState: (idx > this.state.optionsDate.length - 2), selectedDateIndex: parseInt(idx)});
 
     }
-    //<Image style={styles.dropdown_2_image}
-    //       mode='stretch'
-    //       source={icon}
-    ///>
-
     _dropdown_renderSeparator(sectionID, rowID, adjacentRowHighlighted) {
         if (rowID == 4) return;
         let key = `spr_${rowID}`;
@@ -335,7 +328,7 @@ export default class BeachWeather extends Component {
         this._loadWeather(date);
         this._loadHours(date.day);
         let currentActive = [false,false,false,false,false,false,false,false,false,false];
-        this.refs.daysDrop.select(this.state.selectedIndex);
+        this.refs.daysDrop && this.refs.daysDrop.select(this.state.selectedIndex);
         this.setState({activeTime: currentActive, activeHour: false, selectedIndex: this.state.selectedIndex, day: date.toString(), buttonText: date.toString(), prevDayState: this.state.selectedIndex < 1, nextDayState: (this.state.selectedIndex > this.state.optionsDay.length -2 )});
     }
     _handlePress(to){
@@ -374,15 +367,17 @@ export default class BeachWeather extends Component {
             let currentActive = [false,false,false,false,false,false,false,false,false,false];
             this.setState({selectedIndex: selectedIndex, selectedDateIndex: 0, day: selectedDay.toString(), optionsDate:data,
                 optionsDay:days, valueDate: data[0].toString(), buttonText: selectedDay.toString(), activeTime: currentActive, activeHour: false});
-            this.refs.daysDrop.select(selectedIndex);
+            this.refs.daysDrop && this.refs.daysDrop.select(selectedIndex);
+            AsyncStorage.setItem(weatherKey, JSON.stringify({today: today.getTime(), beachName: beachName, data: data, days: days, hoursIndexes: hoursIndexes, current: current}));
         }, (errorMessage, ex)=>{
-            this.setState({result:`data didn't loaded beacuse - ${errorMessage}`});
+            this.setState({result:`data didn't loaded because - ${errorMessage}`});
         });
     }
 
     _handleAppStateChange = (nextAppState) => {
         if (this.state.appState.match(/inactive|background/) && nextAppState === 'active') {
             console.log('App has come to the foreground!');
+            if (Date.now() - today < 5*1000*60) return;
             today = new Date();
             this.fetchForecast(beachLocation, beachName, today);
         }
@@ -413,17 +408,15 @@ export default class BeachWeather extends Component {
         }
         beachLocation = beach.q;
         beachName = beach.name;
-
+        this.setState({beachText: beachName});
         this.fetchForecast(beachLocation, beachName, today);
 
-        AsyncStorage.setItem(beachNameKey, beachName);
-        console.log(`set beach name: ${beachNameKey}`);
-        AsyncStorage.setItem(beachLocationKey, beachLocation);
-        console.log(`set beach location: ${beachLocationKey}`);
+        AsyncStorage.setItem(beachKey, JSON.stringify({location: beachLocation, name: beachName}));
     }
 
     render() {
         let {width, height} = Dimensions.get("window");
+        let headerStyle = this.props.headerStyle || {};
         return (<View style={styles.master_container}>
                 {this.state.showSplash ?
                     (<View>
@@ -441,20 +434,28 @@ export default class BeachWeather extends Component {
                             <Image source={this.state.goodDay ? require('./Charming_sun.png'):require('./Sea_wave.png')}
                                    style={[styles.backgroundImage, {width:width, height: (height + 30) }]}/>
                         </View>
+                        <View style={[styles.beachHeader, headerStyle, {width: width}]}>
                         {this.state.availableBeach? (
                             <ModalDropdown ref="beachSelection"
                                        style={styles.beach_dd}
                                        textStyle={styles.location_title}
-                                       dropdownStyle={styles.beach_dd_dd}
+                                       dropdownStyle={[styles.beach_dd_dd, {height: (this.state.availableBeach.length * 42)}]}
                                        options={this.state.availableBeach}
                                        defaultValue={this.state.beachText}
                                        renderRow={this._render_dropdown_beach.bind(this)}
-                                       onSelect={this._dropdown_onSelectBeach.bind(this)}
-                                       />
+                                       onSelect={this._dropdown_onSelectBeach.bind(this)}>
+                                <View style={styles.beach_view}>
+                                <Text style={styles.beach_text}> {this.state.beachText}</Text>
+                                    <Image style={styles.beach_image}
+                                           source={require('./drop-down-arrow.png')}
+                                    />
+                                    </View>
+                                </ModalDropdown>
                         ) : (<Text style={styles.location_title}>
-                            חוף הצוק
+                            {this.state.beachText}
                         </Text>)
                         }
+                            </View>
                         <View style={styles.dateSelection}>
                             <Button containerStyle={[styles.nav_container,styles.nav_left]}
                                     onPress={() => this._handlePressDay(1)}
@@ -790,14 +791,10 @@ const styles = StyleSheet.create({
     master_container: {
         flex: 1,
         flexDirection:'row',
-        position: 'relative',
-        //alignItems: 'center'
+        position: 'relative'
     },
     splash_main: {
-        //alignSelf: 'center',
-        top: 200,
-        //left: 40,
-        //right: 0,
+        top: 178,
         fontSize: 36,
         fontWeight: 'bold',
         textAlignVertical:'center'
@@ -806,7 +803,7 @@ const styles = StyleSheet.create({
     },
     splash_text: {
         alignSelf: 'center',
-        top: 215,
+        top: 193,
         backgroundColor: 'transparent',
         left: 0,
         right: 0,
@@ -815,24 +812,16 @@ const styles = StyleSheet.create({
         fontSize: 15
     },
     bgImageWrapper: {
-        //flex: 1,
         position: 'absolute',
-        //left: 0, right: 0,
-        marginTop:-30,
-        //alignItems: 'center'
+        marginTop:-30
     },
     backgroundImage: {
-        //height: 600,
         resizeMode: "cover"
     },
     container: {
         flex: 1,
         alignItems: 'center',
         backgroundColor: '#F5FCFF'
-        //backgroundColor: 'rgba(0,0,0,0.2)',
-        ////backgroundColor: 'rgba(0,0,0,0.2)',
-        //paddingTop: 24
-        //marginTop: 22
     },
     dateSelection: {
         flexDirection:  "row",
@@ -840,56 +829,29 @@ const styles = StyleSheet.create({
         marginTop: 15,
         alignItems: "center"
     },
-    location_title: {
-        alignSelf: 'flex-end',
-        marginRight: 20,
-        fontSize: 16,
-        backgroundColor: 'transparent',
-        color: '#333'
-    },
     nav_container: {
         height: 41,
-        //width: 25,
-        //marginRight: 1,
         paddingTop: 3,
         paddingLeft: 5,
         paddingRight: 5,
         borderRadius: 5,
-        //backgroundColor: '#F5FCFF',
         backgroundColor: 'transparent'
-        //backgroundColor: 'cornflowerblue'
     },
     nav_button: {
         color: 'rgba(255,255,255,0.2)',
-        //color: 'cornflowerblue',
         fontSize: 25,
         width: 40,
         height: 35,
-        //backgroundColor: '#F5FCFF',
         textAlign: 'center',
         backgroundColor: 'transparent'
-        //height: 40,
-        //marginRight: 15,
-        //marginTop: 30,
-        //paddingLeft: 5,
-        //paddingRight: 5,
-        //borderRadius: 4,
     },
     nav_left: {
-        //marginRight: 20
     },
     nav_right: {
-        //marginLeft: 20
     },
     data_container: {
         width: 300,
-        height: 120,
-        //borderWidth:1,
-        //borderStyle:"solid",
-        //borderColor: "black"
-        //justifyContent: 'center'
-        //marginTop: 60,
-        //marginBottom: 80
+        height: 120
     },
     content: {
         alignSelf: 'flex-end',
@@ -903,10 +865,7 @@ const styles = StyleSheet.create({
         color: '#333'
     },
     data_text: {
-        //width: 300,
         marginTop: 3,
-        //textAlign: 'center',
-        //color: 'white',
         backgroundColor: 'transparent',
         textAlign: 'right',
         color: '#333'
@@ -921,69 +880,76 @@ const styles = StyleSheet.create({
         color: 'red'
     },
     hourContainer: {
-       //marginTop: 0,
         width: 220
     },
     beach_picker: {
         marginTop: -80,
         alignSelf: 'flex-end',
         width: 100,
-        height:130,
         borderWidth: 0
+    },
+    beachHeader: {
+        height: 30,
+        alignItems: 'flex-end'
+    },
+    location_title: {
+        alignSelf: 'flex-end',
+        marginRight: 20,
+        marginLeft: 20,
+        fontSize: 16,
+        backgroundColor: 'transparent',
+        color: '#333'
     },
     beach_dd: {
         marginTop: 10,
-        alignSelf: 'flex-end',
-        backgroundColor: 'transparent'
+        backgroundColor: 'transparent',
+        borderRadius: 10
+    },
+    beach_view:{
+        width: 97,
+        justifyContent: 'space-between',
+        flexDirection: 'row-reverse',
+    },
+    beach_text:{
+        marginRight: 10,
+        color:'#333'
+    },
+    beach_image:{
+        marginRight: 3,
+        width: 8,
+        height: 8,
+        alignSelf: 'center'
     },
     beach_text_dd: {
         fontSize: 17,
-        marginRight: 30,
-        alignSelf: 'center',
-        width: 100,
-        //textAlign: 'center',
-        textAlign: 'right',
+        width: 110,
+        textAlign: 'center',
         textAlignVertical: 'center',
-        marginHorizontal: 4,
-        //width: 100
+        marginHorizontal: 4
     },
     beach_dd_dd:{
-        marginRight: 40,
-        //height:20
-        //width: 10,
-        //right: 40
+        marginLeft: -10
     },
     dropdown_2: {
         width: 250,
-        //right: 8,
         borderWidth: 0,
         borderRadius: 8,
-        //borderColor: 'white',
-        //borderColor: '#F7F7F7',
         borderColor: 'rgba(255,255,255,0.3)',
-        //backgroundColor: '#007AFF'
         backgroundColor: 'rgba(255,255,255,0.3)'
-        //backgroundColor: 'transparent'
-        //backgroundColor: 'cornflowerblue'
     },
     dropdown_2_text: {
         marginVertical: 10,
         marginHorizontal: 6,
         fontSize: 18,
-        //color: 'white',
         color: '#333',
         textAlign: 'center',
         textAlignVertical: 'center'
-        //borderWidth: 1,
-        //borderStyle:'solid',
-        //borderColor: 'black'
     },
     dropdown_2_dropdown: {
         width: 246,
         height: 300,
         marginLeft: 1,
         marginTop: -1,
-        //borderRadius: 3
         borderColor: 'white',
         borderWidth: 2,
         borderBottomLeftRadius: 3,
@@ -1015,10 +981,6 @@ const styles = StyleSheet.create({
         flexDirection:  "row",
         justifyContent: "center",
         alignItems: "center",
-        //borderTopWidth:1,
-        //borderBottomWidth:1,
-        //borderStyle: "solid",
-        //borderColor: "grey"
     },
     no_chart:{
         marginTop: 30,
@@ -1034,4 +996,3 @@ const styles = StyleSheet.create({
     }
 });
 
-//AppRegistry.registerComponent('BeachWeather', () => BeachWeather);
